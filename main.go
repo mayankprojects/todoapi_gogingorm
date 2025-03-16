@@ -19,7 +19,6 @@ type Todo struct {
 }
 
 var db *gorm.DB
-
 func main() {
 	// Database connection
 	dsn := "root:Gmail@12@tcp(127.0.0.1:3306)/todoapp"
@@ -46,33 +45,48 @@ func main() {
 	r.Run(":8080")
 }
 
-// retrives the query parameter, 
+// retrives the query parameter,
 // if not query parameter is not present then set the limit value as 10
-	
-func getTodos(c *gin.Context) {
 
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+func getTodos(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "10"))
 	status := c.Query("status")
 
-	if limit < 1 {
-		limit = 10
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 10
 	}
 
-	var todos []Todo
+	var allTodos []Todo
 
-	query := db.Limit(limit)
-	
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
+	// Calculate offset
+	offset := (page - 1) * perPage
 
-	result := query.Find(&todos)
+	// First get the paginated todos without status filter
+	result := db.Offset(offset).Limit(perPage).Find(&allTodos)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, todos)
+	// Then filter by status in memory if status parameter provided
+	if status != "" {
+		var filteredTodos []Todo
+		for _, todo := range allTodos {
+			if todo.Status == status {
+				filteredTodos = append(filteredTodos, todo)
+			}
+		}
+		c.JSON(http.StatusOK, filteredTodos)
+		return
+	}
+
+	// Return all todos if no status filter
+	c.JSON(http.StatusOK, allTodos)
 }
 
 // Create a new todo

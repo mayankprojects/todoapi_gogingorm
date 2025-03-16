@@ -12,28 +12,44 @@ import (
 
 // GetTodos retrieves todos with optional limit and status filtering
 func GetTodos(c *gin.Context, db *gorm.DB) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	perPage, _ := strconv.Atoi(c.DefaultQuery("per_page", "10"))
 	status := c.Query("status")
 
-	if limit < 1 {
-		limit = 10
+	// Validate pagination parameters
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 {
+		perPage = 10
 	}
 
-	var todos []models.Todo
+	var allTodos []models.Todo
 
-	query := db.Limit(limit)
+	// Calculate offset
+	offset := (page - 1) * perPage
 
-	if status != "" {
-		query = query.Where("status = ?", status)
-	}
-
-	result := query.Find(&todos)
+	// First get the paginated todos without status filter
+	result := db.Offset(offset).Limit(perPage).Find(&allTodos)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, todos)
+	// Then filter by status in memory if status parameter provided
+	if status != "" {
+		var filteredTodos []models.Todo
+		for _, todo := range allTodos {
+			if todo.Status == status {
+				filteredTodos = append(filteredTodos, todo)
+			}
+		}
+		c.JSON(http.StatusOK, filteredTodos)
+		return
+	}
+
+	// Return all todos if no status filter
+	c.JSON(http.StatusOK, allTodos)
 }
 
 // CreateTodo creates a new todo

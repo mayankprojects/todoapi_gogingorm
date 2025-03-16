@@ -6,6 +6,8 @@ import (
 	"todo/internal/database"
 	"todo/internal/handlers"
 
+	"github.com/gin-contrib/cors"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,6 +20,15 @@ func main() {
 
 	// Create Gin router
 	r := gin.Default()
+
+	// Enable CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 
 	// Routes
 	r.GET("/todos", func(c *gin.Context) { handlers.GetTodos(c, db) })
